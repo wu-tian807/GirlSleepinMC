@@ -83,7 +83,10 @@
       }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      if (typeof updateFurnaceDecay === 'function') updateFurnaceDecay();
       drawDarkness(mouseX, mouseY, lightLevel);
+      if (typeof _drawFurnaceEditor === 'function') _drawFurnaceEditor();
+      if (typeof _drawChestEditor   === 'function') _drawChestEditor();
       drawTorchGlow(mouseX, mouseY);
       if (typeof updateTitleLight === 'function') updateTitleLight();
 
@@ -454,6 +457,76 @@
             if (typeof mpUpdateBackBtn  === 'function') mpUpdateBackBtn();
             if (typeof mpUpdateSongLabel === 'function') mpUpdateSongLabel();
           }
+        }
+      }
+
+      // ── 箱子：hover 白色高光（与工作台 / 熔炉相同风格）──────────────────
+      if (_chestHovered && CHEST_CORNERS && CHEST_FACES) {
+        const cr = getVideoRect();
+        if (cr) {
+          const toScr = ([vx, vy]) => [cr.left + vx * cr.width, cr.top + vy * cr.height];
+          const scr = CHEST_CORNERS.map(toScr);
+
+          ctx.save();
+          ctx.shadowColor = 'rgba(255,255,255,0.6)';
+          ctx.shadowBlur  = 14;
+          ctx.strokeStyle = 'rgba(255,255,255,0.90)';
+          ctx.lineWidth   = 4;
+          ctx.setLineDash([]);
+          ctx.lineJoin    = 'round';
+
+          for (const face of CHEST_FACES) {
+            const pts = face.idx.map(i => scr[i]);
+            const skip = new Set(face.skipEdges || []);
+            // 半透明填充
+            ctx.beginPath();
+            ctx.moveTo(pts[0][0], pts[0][1]);
+            for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0], pts[j][1]);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
+            // 逐边描边（跳过 skipEdges）
+            for (let i = 0; i < pts.length; i++) {
+              if (skip.has(i)) continue;
+              const j = (i + 1) % pts.length;
+              ctx.beginPath();
+              ctx.moveTo(pts[i][0], pts[i][1]);
+              ctx.lineTo(pts[j][0], pts[j][1]);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+      }
+
+      // ── 熔炉：hover 白色高光（与工作台相同风格，画在 flame-canvas）────
+      if (_furnaceHovered && FURNACE_CORNERS && FURNACE_FACES) {
+        const fr = getVideoRect();
+        if (fr) {
+          const toScr = ([vx, vy]) => [fr.left + vx * fr.width, fr.top + vy * fr.height];
+          const scr = FURNACE_CORNERS.map(toScr);
+
+          ctx.save();
+          ctx.shadowColor = 'rgba(255,255,255,0.6)';
+          ctx.shadowBlur  = 14;
+          ctx.strokeStyle = 'rgba(255,255,255,0.90)';
+          ctx.lineWidth   = 4;
+          ctx.setLineDash([]);
+          ctx.lineJoin    = 'round';
+
+          for (const face of FURNACE_FACES) {
+            const pts = face.idx.map(i => scr[i]);
+            ctx.beginPath();
+            ctx.moveTo(pts[0][0], pts[0][1]);
+            for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0], pts[j][1]);
+            if (pts.length > 2) {
+              ctx.closePath();
+              ctx.stroke();
+              ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
+            } else {
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
         }
       }
 

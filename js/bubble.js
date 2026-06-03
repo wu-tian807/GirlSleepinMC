@@ -28,7 +28,7 @@
       // 字体大小随气泡缩放
       bubbleText.style.fontSize = (size * 0.14) + 'px';
       bubbleText.textContent = BUBBLE_TEXTS[Math.floor(Math.random() * BUBBLE_TEXTS.length)];
-      bubbleText.classList.remove('fire-blind');
+      bubbleText.classList.remove('fire-blind', 'chest-grumble');
 
       // 重置动画
       bubbleEl.classList.remove('hide', 'show');
@@ -112,6 +112,12 @@
         return;
       }
 
+      // ── 箱子点击：上锁音效 + 字幕 ──────────────────────────────────
+      if (_chestHovered) {
+        triggerLockedChest();
+        return;
+      }
+
       // ── 工作台点击检测（优先级最高）────────────────────────────────
       // 直接命中 title 元素时不展开（已在上面处理）
       if (isInWorkbench(e.clientX, e.clientY) && !onTitle) {
@@ -139,6 +145,110 @@
     function onWorkbenchClick(e) {
       _wbExpanded = true;
     }
+
+    // ─── 箱子上锁：音效 + Minecraft action-bar 字幕 ─────────────────
+    const _chestSounds = [
+      new Audio('sounds/Chest_open_locked.ogg'),
+      new Audio('sounds/Chest_close_locked.ogg'),
+    ];
+    _chestSounds.forEach(a => { a.volume = 0.9; });
+
+    let _subtitleHoldTimer = null;
+    let _subtitleFadeTimer = null;
+
+    function showActionBar(text) {
+      let el = document.getElementById('mc-action-bar');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'mc-action-bar';
+        el.style.cssText = [
+          'position:fixed',
+          'left:50%',
+          'bottom:18%',
+          'transform:translateX(-50%)',
+          'color:#fff',
+          'font:400 16px "MinecraftDefault",monospace',
+          'letter-spacing:0.02em',
+          'text-shadow:2px 2px 0 rgba(0,0,0,0.75)',
+          'pointer-events:none',
+          'z-index:99990',
+          'opacity:0',
+          'white-space:nowrap',
+        ].join(';');
+        document.body.appendChild(el);
+      }
+      el.textContent = text;
+
+      // 清除上次定时器
+      if (_subtitleHoldTimer) { clearTimeout(_subtitleHoldTimer); _subtitleHoldTimer = null; }
+      if (_subtitleFadeTimer) { clearTimeout(_subtitleFadeTimer); _subtitleFadeTimer = null; }
+
+      // 淡入（300ms）
+      el.style.transition = 'opacity 0.3s ease';
+      requestAnimationFrame(() => { el.style.opacity = '1'; });
+
+      // 停留 1.8s 后淡出（600ms）
+      _subtitleHoldTimer = setTimeout(() => {
+        el.style.transition = 'opacity 0.6s ease';
+        el.style.opacity = '0';
+      }, 1800);
+    }
+
+    // 箱子彩蛋台词：可爱 + 睡意，5% 概率触发
+    const CHEST_GRUMBLE_TEXTS = [
+      '💢 ...noisy.',
+      '💢 Shh...!',
+      '💢 So loud...',
+      '💢 ...hmph.',
+      '💢 Not now...',
+      '💢 Go away...',
+      '💢 ...sleepy.',
+      '💢 Ugh...',
+      '💢 ...quiet.',
+      '💢 *yawns*',
+    ];
+
+    function _showChestGrumble() {
+      const r = getVideoRect();
+      if (!r) return;
+      const size = r.width * 0.11;
+      const cx   = r.left + r.width  * HEAD_CX;
+      const cy   = r.top  + r.height * HEAD_CY;
+      bubbleEl.style.width  = size + 'px';
+      bubbleEl.style.height = size + 'px';
+      bubbleEl.style.left   = (cx + size * 0.3) + 'px';
+      bubbleEl.style.top    = (cy - size * 1.35) + 'px';
+      bubbleText.style.fontSize = (size * 0.13) + 'px';
+      bubbleText.textContent =
+        CHEST_GRUMBLE_TEXTS[Math.floor(Math.random() * CHEST_GRUMBLE_TEXTS.length)];
+      bubbleText.classList.remove('fire-blind');
+      bubbleText.classList.add('chest-grumble');
+      bubbleEl.classList.remove('hide', 'show');
+      void bubbleEl.offsetHeight;
+      bubbleEl.classList.add('show');
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(() => {
+        bubbleEl.classList.replace('show', 'hide');
+        bubbleText.classList.remove('chest-grumble');
+        bubbleTimer = setTimeout(() => bubbleEl.classList.remove('hide'), 600);
+      }, 1800);
+
+      // 画面轻微震动
+      document.body.classList.remove('screen-shake');
+      void document.body.offsetHeight;   // 强制重排，确保动画重播
+      document.body.classList.add('screen-shake');
+      setTimeout(() => document.body.classList.remove('screen-shake'), 400);
+    }
+
+    function triggerLockedChest() {
+      const snd = _chestSounds[Math.floor(Math.random() * _chestSounds.length)];
+      snd.currentTime = 0;
+      snd.play().catch(() => {});
+      showActionBar('Chest locked');
+      // 5% 概率触发抱怨气泡
+      if (Math.random() < 0.05) _showChestGrumble();
+    }
+    window.triggerLockedChest = triggerLockedChest;
 
     turnBtn.addEventListener('click', (e) => {
       e.stopPropagation();

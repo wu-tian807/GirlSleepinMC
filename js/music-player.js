@@ -508,27 +508,88 @@ function mpOpen() {
   mpEnsureBackBtn();
 }
 
-// ── 滚轮 ──────────────────────────────────────────────────────────────
-function mpInitWheel() {
+// ── 左键拖动滚动 ─────────────────────────────────────────────────────
+let _mpDragActive  = false;
+let _mpDragStartY  = 0;
+let _mpDragStartOff = 0;
+let _mpSbForceShow = false;   // hover 期间强制显示滚动条
+
+function mpInitDrag() {
   const panel = document.getElementById('wb-panel');
-  if (!panel || panel._mpWheelBound) return;
-  panel._mpWheelBound = true;
+  if (!panel || panel._mpDragBound) return;
+  panel._mpDragBound = true;
 
-  panel.addEventListener('wheel', (e) => {
-    const menu = document.getElementById('wb-menu');
-    if (!menu) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const dir    = e.deltaY > 0 ? 1 : -1;
+  // hover 时显示滚动条（提示可拖动）
+  panel.addEventListener('mouseenter', () => {
     const maxOff = Math.max(0, _mpItems.length - WB_SLOT_COUNT);
-    _mpOffset = Math.max(0, Math.min(maxOff, _mpOffset + dir));
-    _mpSelected = -1;
-    _mpSaveNav();
-    mpRender();
-    mpShowScrollbar();
-  }, { passive: false });
+    if (maxOff <= 0) return;
+    _mpSbForceShow = true;
+    mpEnsureScrollbarDom();
+    mpUpdateScrollbar();
+    const bar = document.getElementById('wb-scrollbar');
+    if (bar) { clearTimeout(_mpSbTimer); bar.classList.add('visible'); }
+  });
+
+  panel.addEventListener('mouseleave', () => {
+    _mpSbForceShow = false;
+    if (!_mpDragActive) {
+      const bar = document.getElementById('wb-scrollbar');
+      if (bar) {
+        _mpSbTimer = setTimeout(() => bar.classList.remove('visible'), 400);
+      }
+    }
+  });
+
+  // 拖动开始
+  panel.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const maxOff = Math.max(0, _mpItems.length - WB_SLOT_COUNT);
+    if (maxOff <= 0) return;
+    _mpDragActive   = true;
+    _mpDragStartY   = e.clientY;
+    _mpDragStartOff = _mpOffset;
+    e.preventDefault();
+  });
+
+  // 拖动中（绑在 window 防止移出 panel 后丢失）
+  window.addEventListener('mousemove', (e) => {
+    if (!_mpDragActive) return;
+
+    // 用第 0、1 栏间距估算单栏像素高
+    const inner  = document.getElementById('wb-panel-inner');
+    const ih     = inner ? inner.clientHeight : 200;
+    const r0     = mpGetSlotRect(0);
+    const r1     = mpGetSlotRect(1);
+    const slotPx = ih * (r1.t - r0.t);   // 单栏像素高
+
+    const dy     = e.clientY - _mpDragStartY;
+    const maxOff = Math.max(0, _mpItems.length - WB_SLOT_COUNT);
+
+    // 向下拖 → 向上滚（offset 减小），保持颗粒感（round 锁格）
+    const raw    = _mpDragStartOff - dy / slotPx;
+    const next   = Math.max(0, Math.min(maxOff, Math.round(raw)));
+
+    if (next !== _mpOffset) {
+      _mpOffset  = next;
+      _mpSelected = -1;
+      _mpSaveNav();
+      mpRender();
+      mpUpdateScrollbar();          // 直接更新位置，不触发自动隐藏计时器
+    }
+  });
+
+  // 拖动结束
+  window.addEventListener('mouseup', () => {
+    if (!_mpDragActive) return;
+    _mpDragActive = false;
+    // 如果鼠标已离开 panel，延迟隐藏
+    if (!_mpSbForceShow) {
+      const bar = document.getElementById('wb-scrollbar');
+      if (bar) {
+        _mpSbTimer = setTimeout(() => bar.classList.remove('visible'), 600);
+      }
+    }
+  });
 }
 
 // ── 滚动指示条 ────────────────────────────────────────────────────────
@@ -558,6 +619,12 @@ function mpUpdateScrollbar() {
   }
   bar.style.display = '';
 
+  // 若 hover 或拖动中，保持 visible（导航重绘后不丢失）
+  if (_mpSbForceShow || _mpDragActive) {
+    clearTimeout(_mpSbTimer);
+    bar.classList.add('visible');
+  }
+
   // 轨道范围：第 1 栏顶到第 9 栏底（百分比）
   const r0      = mpGetSlotRect(0);
   const r8      = mpGetSlotRect(WB_SLOT_COUNT - 1);
@@ -585,9 +652,12 @@ function mpShowScrollbar() {
   if (!bar) return;
   bar.classList.add('visible');
   clearTimeout(_mpSbTimer);
-  _mpSbTimer = setTimeout(() => {
-    if (bar) bar.classList.remove('visible');
-  }, 800);
+  // hover 或拖动中：不启动自动隐藏计时器
+  if (!_mpSbForceShow && !_mpDragActive) {
+    _mpSbTimer = setTimeout(() => {
+      if (bar) bar.classList.remove('visible');
+    }, 800);
+  }
 }
 
 // ── 初始化 ────────────────────────────────────────────────────────────
@@ -598,7 +668,7 @@ function mpShowScrollbar() {
   const obs = new MutationObserver(() => {
     if (panel.classList.contains('open')) {
       mpOpen();
-      mpInitWheel();
+      mpInitDrag();
     }
   });
   obs.observe(panel, { attributes: true, attributeFilter: ['class'] });
