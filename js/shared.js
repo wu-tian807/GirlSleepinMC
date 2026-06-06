@@ -1,7 +1,7 @@
 // shared.js — cross-module mutable globals (var for cross-script access)
 // Load FIRST before all other JS modules
 
-var furnaceLevel  = 50;       // controlled by fire slider
+var furnaceLevel  = 0;        // 0 = 无燃料，由燃料点燃后驱动；可用滑块调试
 var lightLevel    = -64;      // driven by furnaceLevel
 var userUnmuted   = false;
 var mouseX = -9999, mouseY = -9999;
@@ -152,11 +152,22 @@ var WB_RIGHT_TILT = 40;   // 右线：从竖直向下顺时针 30°
 var WB_LEFT_EXT = 0.0000;
 
 // ── 熔炉燃料 & 烧制状态 ──────────────────────────────────────────────────
-var fuelSeconds      = 0;     // 当前燃料剩余秒数（倒计时，线性衰减）
-var fuelTotalSeconds = 0;     // 当前燃料点燃时的总秒数（用于计算 furnaceLevel）
-var fuelQueue        = [];    // ItemStack[]，排队等待燃烧的燃料
-var smeltProgress    = 0;     // 当前烧制进度（秒，0 → SMELT_DURATION）
-var furnaceUIOpen    = false;
+// furnaceLevel 就是火力值本身（0-100），由它决定能否烧制（>=10才可烧）
+// furnaceLevelDecayRate：每秒衰减量，点燃燃料时设置，furnaceLevel=0时归零
+var furnaceLevelDecayRate = 0;  // units/s，点燃燃料时由燃料热量时长计算
+var fuelQueue        = [];      // ItemStack[]，排队等待燃烧的燃料
+var smeltProgress    = 0;       // 当前烧制进度（秒，0 → SMELT_DURATION）
+
+// ── 系统时间锚点（wall-clock，ms）─────────────────────────────────────────
+// 用于在 WE 暂停 / 页面关闭期间保持时间正确推进
+// furnaceLevel 锚点：furnaceLevel = anchorValue - decayRate * (now - anchorTs)/1000
+var _furnaceLevelAnchorValue = 0;   // 锚点时刻的 furnaceLevel（0-100）
+var _furnaceLevelAnchorTs    = 0;   // Date.now() 毫秒，0 表示尚未设置
+// smelt 锚点：smeltProgress = (Date.now() - _smeltStartTs) / 1000（当 _smeltIsActive）
+var _smeltStartTs    = 0;           // 虚拟烧制开始时间（已补偿已积累进度），0=未激活
+var _smeltIsActive   = false;       // 当前是否处于活跃烧制状态
+var furnaceUIOpen         = false;
+var DEBUG_FURNACE_LAYOUT  = false; // true 时激活熔炉布局编辑器
 
 // 槽位：null 表示空，非 null 为 { item: string, count: number }
 var furnaceInputSlot  = { item: 'oak_log', count: 1 };
@@ -165,3 +176,8 @@ var furnaceOutputSlot = null;
 
 // 鼠标持有的物品（拖拽中）
 var furnaceHeldItem = null;
+
+// ── 玩家背包 ─────────────────────────────────────────────────────────────
+// 由 save.js loadInventory() 在页面加载时恢复
+var inventoryData = new Array(27).fill(null);  // 背包（3×9）
+var hotbarData    = new Array(9).fill(null);   // 快捷栏（1×9）

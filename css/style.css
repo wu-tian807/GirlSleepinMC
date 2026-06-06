@@ -599,7 +599,7 @@
        熔炉 GUI
     ══════════════════════════════════════════════════════════════════ */
 
-    /* 全屏遮罩 */
+    /* 全屏遮罩（pointer-events:all 确保拦截一切穿透点击） */
     #furnace-gui {
       position: fixed;
       inset: 0;
@@ -608,24 +608,28 @@
       justify-content: center;
       background: rgba(0, 0, 0, 0.55);
       z-index: 20000;
+      pointer-events: all;
+      cursor: default;
     }
-    #furnace-gui.hidden { display: none; }
+    #furnace-gui.hidden { display: none; pointer-events: none; }
 
-    /* GUI 主体：furnace.png 3x pixelated */
+    /* GUI 主体：furnace.png 256×256 纹理图集，以 3× 显示（768×768），
+       overflow:hidden 裁剪出有效区域 176×166 × 3 = 528×498 */
     #furnace-gui-inner {
       position: relative;
-      /* 176×166 × 3 = 528×498 */
       width:  528px;
       height: 498px;
       image-rendering: pixelated;
       user-select: none;
+      overflow: hidden;
     }
 
     #furnace-bg {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      /* 256 × 3 = 768，让整张图集在 3× 坐标系下正确显示 */
+      width:  768px;
+      height: 768px;
       image-rendering: pixelated;
       pointer-events: none;
     }
@@ -658,6 +662,7 @@
     .fslot-count {
       position: absolute;
       bottom: 1px; right: 3px;
+      z-index: 2;
       font-family: 'MinecraftDefault', monospace;
       font-size: 18px;
       color: #fff;
@@ -694,19 +699,16 @@
       display: block;
     }
 
-    /* ── 关闭按钮 ─────────────────────────────────────────────────────── */
-    #furnace-close {
+    /* 烧制进度文字提示 */
+    #fsmelt-label {
       position: absolute;
-      top: 4px; right: 6px;
-      background: none;
-      border: none;
-      color: rgba(255,255,255,0.5);
-      font-size: 18px;
-      cursor: pointer;
-      padding: 4px 6px;
-      line-height: 1;
+      bottom: 6px; right: 10px;
+      font-size: 10px;
+      color: rgba(255,255,220,0.7);
+      font-family: 'MinecraftDefault', monospace;
+      pointer-events: none;
+      white-space: nowrap;
     }
-    #furnace-close:hover { color: #fff; }
 
     /* ── 持有物品（跟随鼠标）──────────────────────────────────────────── */
     #furnace-held {

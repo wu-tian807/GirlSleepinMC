@@ -11,23 +11,18 @@ var _mpSelected = -1;   // 当前选中的视口内槽位索引（0~8）
 // 滚动条淡出定时器
 var _mpSbTimer  = null;
 
-// ── 导航状态持久化（localStorage）────────────────────────────────────
-var MP_NAV_KEY = 'mc_mp_nav';
-
+// ── 导航状态持久化（接口由 save.js 提供）────────────────────────────
 function _mpSaveNav() {
-  try {
-    const path = _mpStack.map(s => s.label);
-    localStorage.setItem(MP_NAV_KEY, JSON.stringify({ path, offset: _mpOffset }));
-  } catch (e) {}
+  saveNav(_mpStack.map(s => s.label), _mpOffset);
 }
 
 // 从 root 开始按 label 路径重建 _mpStack，找不到就停在已走到的位置
 function _mpRestoreNav() {
   _mpStack = [];
   try {
-    const raw = localStorage.getItem(MP_NAV_KEY);
-    if (raw) {
-      const { path, offset } = JSON.parse(raw);
+    const saved = loadNav();
+    if (saved) {
+      const { path, offset } = saved;
       if (Array.isArray(path)) {
         let entries = _mpRootEntries();
         for (const label of path) {

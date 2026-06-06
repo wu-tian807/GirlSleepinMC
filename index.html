@@ -63,7 +63,8 @@
       <div id="ffuel-bar"><img src="textures/gui/furnace_lit_progress.png" alt="" draggable="false"></div>
       <!-- 烧制进度箭头 -->
       <div id="fsmelt-arrow"><img src="textures/gui/furnace_burn_progress.png" alt="" draggable="false"></div>
-      <button id="furnace-close">✕</button>
+      <!-- 烧制进度文字（右下角，方便确认进度） -->
+      <div id="fsmelt-label"></div>
     </div>
   </div>
   <!-- 鼠标持有的物品 -->
@@ -71,6 +72,7 @@
 
   <!-- load order matters: shared state first, then modules -->
   <script src="js/shared.js"></script>
+  <script src="js/save.js"></script>
   <script src="music-manifest.js"></script>
   <script src="js/video.js"></script>
   <script src="js/audio-crackle.js"></script>

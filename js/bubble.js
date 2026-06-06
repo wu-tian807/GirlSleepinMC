@@ -93,6 +93,9 @@
         return;   // 首次点击仅解除静音，不触发翻身
       }
 
+      // ── 熔炉 UI 开启时屏蔽所有背景点击 ─────────────────────────────
+      if (furnaceUIOpen) return;
+
       // ── title 悬浮图点击：暂停 / 继续（不展开面板）────────────────
       const titleEl = document.getElementById('wb-title');
       // wrapper 是 div，点击可能命中内部 img，用 closest 统一处理

@@ -132,81 +132,71 @@
     const furnaceSlider = document.getElementById('furnace-slider');
     const furnaceValEl  = document.getElementById('furnace-val');
 
-    // slider 保留做调试用，但正常运行下 fuelSeconds 驱动 furnaceLevel
+    // slider 调试用：直接设置 furnaceLevel，同步重置锚点
     furnaceSlider.addEventListener('input', () => {
       furnaceLevel = parseInt(furnaceSlider.value, 10);
+      // 重置锚点，保持当前衰减率继续从新值衰减
+      _furnaceLevelAnchorValue = furnaceLevel;
+      _furnaceLevelAnchorTs    = Date.now();
       furnaceValEl.textContent = furnaceLevel;
       lightLevel = furnaceToLight(furnaceLevel);
       if (userUnmuted) _setCrackleVol();
     });
 
-    // ─── 熔炉状态持久化 ────────────────────────────────────────────────
-    function _furnaceStateSave() {
-      try {
-        localStorage.setItem('furnaceState', JSON.stringify({
-          fuelSeconds      : fuelSeconds,
-          fuelTotalSeconds : fuelTotalSeconds,
-          fuelQueue        : fuelQueue,
-          smeltProgress    : smeltProgress,
-          inputSlot        : furnaceInputSlot,
-          fuelSlot         : furnaceFuelSlot,
-          outputSlot       : furnaceOutputSlot,
-          ts               : Date.now(),
-        }));
-      } catch {}
-    }
-    window._furnaceStateSave = _furnaceStateSave;
+    // ─── 熔炉状态持久化（接口由 save.js 提供）────────────────────────────
+    // 保存：直接调用 save.js 的 saveFurnace()，此处仅暴露别名供 furnace-ui.js 使用
+    window._furnaceStateSave = function() { saveFurnace(); };
 
-    // 页面加载时恢复状态并补算离线燃烧
+    // 页面加载时恢复状态（基于系统时间锚点，自动包含离线时间）
     (() => {
-      try {
-        // 兼容旧 key
-        localStorage.removeItem('furnaceDecay');
-        const raw = localStorage.getItem('furnaceState');
-        if (!raw) return;
-        const s = JSON.parse(raw);
-        const elapsed = Math.max(0, (Date.now() - s.ts) / 1000);
+      const s = loadFurnace();   // save.js 负责读取 + 旧格式迁移
+      if (!s) return;
 
-        fuelSeconds      = Math.max(0, (s.fuelSeconds || 0) - elapsed);
-        fuelTotalSeconds = s.fuelTotalSeconds || 0;
-        fuelQueue        = s.fuelQueue  || [];
-        smeltProgress    = s.smeltProgress || 0;
-        if (s.inputSlot)  furnaceInputSlot  = s.inputSlot;
-        if (s.fuelSlot)   furnaceFuelSlot   = s.fuelSlot;
-        if (s.outputSlot) furnaceOutputSlot = s.outputSlot;
+      // ── 恢复 furnaceLevel 锚点 ────────────────────────────────────────
+      _furnaceLevelAnchorValue = s.furnaceLevelAnchorValue || 0;
+      _furnaceLevelAnchorTs    = s.furnaceLevelAnchorTs    || 0;
+      furnaceLevelDecayRate    = s.furnaceLevelDecayRate   || 0;
 
-        // 若离线时燃料耗尽，尝试自动点燃队列
-        if (fuelSeconds <= 0 && fuelQueue.length > 0) {
-          // 延迟到 furnace-ui.js 加载后执行
-          setTimeout(() => { if (typeof _tryAutoStartFuel === 'function') _tryAutoStartFuel(); }, 0);
-        }
+      // 从锚点计算当前 furnaceLevel（自动包含离线经过的时间）
+      if (_furnaceLevelAnchorTs > 0 && furnaceLevelDecayRate > 0) {
+        const elapsed = (Date.now() - _furnaceLevelAnchorTs) / 1000;
+        furnaceLevel  = Math.max(0, _furnaceLevelAnchorValue - furnaceLevelDecayRate * elapsed);
+        if (furnaceLevel === 0) furnaceLevelDecayRate = 0;
+      }
 
-        furnaceLevel = fuelTotalSeconds > 0
-          ? (fuelSeconds / fuelTotalSeconds) * 100 : 0;
-        lightLevel   = furnaceToLight(furnaceLevel);
-        furnaceSlider.value      = Math.round(furnaceLevel);
-        furnaceValEl.textContent = Math.round(furnaceLevel);
-      } catch {}
+      fuelQueue = s.fuelQueue || [];
+
+      // ── 恢复 smelt 锚点 ───────────────────────────────────────────────
+      _smeltStartTs  = s.smeltStartTs  || 0;
+      _smeltIsActive = s.smeltIsActive || false;
+      // smeltProgress 初值（tickFurnace 首帧会用锚点重新计算）
+      smeltProgress  = (_smeltIsActive && _smeltStartTs > 0)
+        ? Math.max(0, (Date.now() - _smeltStartTs) / 1000) % 1800  // 宽松上限，tickFurnace 负责完整处理
+        : 0;
+
+      if (s.inputSlot)  furnaceInputSlot  = s.inputSlot;
+      if (s.fuelSlot)   furnaceFuelSlot   = s.fuelSlot;
+      if (s.outputSlot) furnaceOutputSlot = s.outputSlot;
+
+      // 若火力耗尽则尝试从槽/队列点燃
+      if (furnaceLevelDecayRate === 0) {
+        setTimeout(() => { if (typeof _tryAutoStartFuel === 'function') _tryAutoStartFuel(); }, 0);
+      }
+
+      lightLevel   = furnaceToLight(furnaceLevel);
+      furnaceSlider.value      = Math.round(furnaceLevel);
+      furnaceValEl.textContent = Math.round(furnaceLevel);
     })();
 
     // 每帧调用（由 main.js animateFlame 驱动）
-    let _decayLastT  = performance.now();
+    // 基于系统时间锚点计算，不依赖帧间 dt——WE 暂停/页面关闭后恢复也正确
     let _decaySaveTs = Date.now();
     function updateFurnaceDecay() {
-      const now = performance.now();
-      const dt  = Math.min((now - _decayLastT) / 1000, 1);  // 秒，最大 1s 防跳帧
-      _decayLastT = now;
-
-      // ── 燃料线性倒计时 ────────────────────────────────────────────
-      if (fuelSeconds > 0) {
-        fuelSeconds = Math.max(0, fuelSeconds - dt);
-        if (fuelSeconds === 0) {
-          if (typeof _tryAutoStartFuel === 'function') _tryAutoStartFuel();
-        }
-        furnaceLevel = fuelTotalSeconds > 0
-          ? (fuelSeconds / fuelTotalSeconds) * 100 : 0;
-      } else {
-        furnaceLevel = 0;
+      // ── furnaceLevel 从锚点计算（wall-clock，自动追赶暂停/离线时间）──
+      if (furnaceLevelDecayRate > 0 && _furnaceLevelAnchorTs > 0) {
+        const elapsed = (Date.now() - _furnaceLevelAnchorTs) / 1000;
+        furnaceLevel  = Math.max(0, _furnaceLevelAnchorValue - furnaceLevelDecayRate * elapsed);
+        if (furnaceLevel === 0) furnaceLevelDecayRate = 0;
       }
 
       lightLevel = furnaceToLight(furnaceLevel);
@@ -222,11 +212,11 @@
       const nowMs = Date.now();
       if (nowMs - _decaySaveTs >= 10000) {
         _decaySaveTs = nowMs;
-        _furnaceStateSave();
+        saveFurnace();
       }
 
-      // 驱动烧制进度
-      if (typeof tickFurnace === 'function') tickFurnace(dt);
+      // 驱动烧制进度（tickFurnace 不再需要 dt）
+      if (typeof tickFurnace === 'function') tickFurnace();
     }
     window.updateFurnaceDecay = updateFurnaceDecay;
 
