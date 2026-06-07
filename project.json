@@ -1,9 +1,15 @@
 {
   "file": "index.html",
   "preview": "",
-  "title": "GirlSleepinMC",
+  "title": "EmberDreams",
   "type": "web",
   "properties": {
+    "autounmute": {
+      "order": 0,
+      "title": "Auto Unmute (Wallpaper Engine)",
+      "type": "bool",
+      "value": true
+    },
     "cracklevol": {
       "order": 1,
       "title": "Furnace Crackle Volume",

@@ -287,6 +287,10 @@
       _startCrackle();   // 首次用户交互后启动炉火音效
     }
 
+    // WE applyUserProperties 触发 autounmute 的接口（视频初始化后调用才安全）
+    window._weAutoUnmuteOnReady = function() {
+      if (!userUnmuted) unmute();
+    };
 
     // ─── 初始化：只启动前台 rightSleep，后台什么都不做 ───────────────
     // 随机初始睡眠方向

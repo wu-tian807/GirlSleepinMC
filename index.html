@@ -15,19 +15,6 @@
   <canvas id="darkness-canvas"></canvas>
   <canvas id="flame-canvas"></canvas>
 
-  <!-- 调试面板（按 ` 切换显示/隐藏，默认隐藏） -->
-  <div id="debug-panel" class="hidden">
-  <!-- 火力调节滑条 -->
-  <div id="light-slider-ui">
-    <div class="slider-row">
-      <span class="row-label">fire</span>
-      <span>🪨</span>
-      <input id="furnace-slider" type="range" min="0" max="100" value="50" step="1">
-      <span>🔥</span>
-      <span id="furnace-val">50</span>
-    </div>
-  </div>
-
   <!-- 睡梦气泡 -->
   <div id="speech-bubble">
     <img src="dialogue_noBG.png" alt="">
@@ -47,9 +34,20 @@
     </div>
   </div>
 
-  <button id="turn-btn">turn()</button>
-  <button id="shiver-btn" onclick="if(typeof playShiver==='function'){showShiverBubble&&showShiverBubble();playShiver();}">shiver()</button>
-  <div id="hud"></div>
+  <!-- 调试面板（按 ` 切换显示/隐藏，默认隐藏） -->
+  <div id="debug-panel" class="hidden">
+    <div id="light-slider-ui">
+      <div class="slider-row">
+        <span class="row-label">fire</span>
+        <span>🪨</span>
+        <input id="furnace-slider" type="range" min="0" max="100" value="50" step="1">
+        <span>🔥</span>
+        <span id="furnace-val">50</span>
+      </div>
+    </div>
+    <button id="turn-btn">turn()</button>
+    <button id="shiver-btn" onclick="if(typeof playShiver==='function'){showShiverBubble&&showShiverBubble();playShiver();}">shiver()</button>
+    <div id="hud"></div>
   </div><!-- /#debug-panel -->
 
   <div id="unmute-tip">CLICK TO UNMUTE</div>

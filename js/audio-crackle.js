@@ -21,14 +21,19 @@
     // WE 用户可调基础音量（0~1），由 project.json cracklevol 参数控制，默认 1.0
     let _crackleMasterVol = 1.0;
 
-    // 监听 Wallpaper Engine 用户属性变化
-    window.wallpaperPropertyListener = window.wallpaperPropertyListener || {};
-    const _prevApply = window.wallpaperPropertyListener.applyUserProperties;
-    window.wallpaperPropertyListener.applyUserProperties = function(props) {
-      if (_prevApply) _prevApply(props);
-      if (props.cracklevol !== undefined) {
-        _crackleMasterVol = props.cracklevol.value / 100;
-        if (typeof _setCrackleVol === 'function') _setCrackleVol();
+    // 监听 Wallpaper Engine 用户属性变化（在此作用域内定义，可安全访问 _setCrackleVol）
+    window.wallpaperPropertyListener = {
+      applyUserProperties: function(props) {
+        // autounmute：WE 加载时自动解除静音
+        if (props.autounmute && props.autounmute.value === true) {
+          if (typeof window._weAutoUnmuteOnReady === 'function') {
+            window._weAutoUnmuteOnReady();
+          }
+        }
+        if (props.cracklevol !== undefined) {
+          _crackleMasterVol = props.cracklevol.value / 100;
+          _setCrackleVol();
+        }
       }
     };
 
